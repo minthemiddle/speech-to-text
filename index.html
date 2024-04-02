@@ -46,6 +46,7 @@
                 response: 'To be replaced with converted text.',
                 mediaRecorder: null,
                 audioChunks: [],
+                audioPlayer: null,
 
                 startRecording() {
                     navigator.mediaDevices.getUserMedia({audio: true})
@@ -98,6 +99,15 @@
                 updatePrompt() {
                     localStorage.setItem('prompt', this.prompt);
                 },
+
+                clearRecording() {
+                    this.audioChunks = [];
+                },
+
+                playRecording() {
+                    const blob = new Blob(this.audioChunks, {type: 'audio/webm'});
+                    this.audioPlayer = new Audio(URL.createObjectURL(blob));
+                    this.audioPlayer.play();
                 }
             }
         }
