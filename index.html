@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Text</title>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 py-8">
+    <div class="max-w-md mx-auto bg-white shadow-md rounded-md p-6" x-data="speechToText()">
+        <h1 class="text-2xl font-bold mb-4">Speech to Text</h1>
+        <div class="mb-4">
+            <label for="api-key" class="block font-medium mb-1">OpenAI API Key:</label>
+            <input type="text" id="api-key" class="border border-gray-300 rounded-md px-3 py-2 w-full" x-model="apiKey"
+                @input="updateApiKey" placeholder="Enter your API key" />
+        </div>
+        <div class="mb-4">
+            <label for="prompt" class="block font-medium mb-1">Prompt (optional):</label>
+            <input type="text" id="prompt" class="border border-gray-300 rounded-md px-3 py-2 w-full" x-model="prompt"
+                placeholder="Enter a prompt" />
+        </div>
+        <div class="flex justify-between mb-4">
+            <button class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md"
+                x-on:click="startRecording">Record</button>
+            <button class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md"
+                x-on:click="stopRecording" :disabled="!isRecording">Stop Record</button>
+            <button class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md"
+                x-on:click="convertToText" :disabled="audioChunks.length === 0">Convert</button>
+        </div>
+        <div class="flex justify-center mb-4" x-show="isLoading">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+        <div id="response" class="bg-gray-100 p-4 rounded-md" x-text="response"></div>
+    </div>
+
+    <script>
+        function speechToText() {
+            return {
+                apiKey: localStorage.getItem('apiKey') || '',
+                prompt: '',
+                isRecording: false,
+                isLoading: false,
+                response: '',
+                mediaRecorder: null,
+                audioChunks: [],
+
+                startRecording() {
+                    navigator.mediaDevices.getUserMedia({audio: true})
+                        .then(stream => {
+                            this.mediaRecorder = new MediaRecorder(stream);
+                            this.mediaRecorder.addEventListener('dataavailable', e => this.audioChunks.push(e.data));
+                            this.mediaRecorder.addEventListener('stop', () => {
+                                this.isRecording = false;
+                            });
+                            this.mediaRecorder.start();
+                            this.isRecording = true;
+                        })
+                        .catch(error => console.error('Error accessing microphone:', error));
+                },
+
+                stopRecording() {
+                    this.mediaRecorder.stop();
+                },
+
+                convertToText() {
+                    this.isLoading = true;
+                    const blob = new Blob(this.audioChunks, {type: 'audio/webm'});
+                    const formData = new FormData();
+                    formData.append('file', blob, 'audio.webm');
+                    formData.append('model', 'whisper-1');
+                    formData.append('prompt', this.prompt);
+
+                    fetch('https://api.openai.com/v1/audio/transcriptions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${this.apiKey}`
+                        },
+                        body: formData
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            this.response = data.text;
+                            this.isLoading = false;
+                        })
+                        .catch(error => {
+                            console.error('Error converting to text:', error);
+                            this.isLoading = false;
+                        });
+                },
+
+                updateApiKey() {
+                    localStorage.setItem('apiKey', this.apiKey);
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
